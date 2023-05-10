@@ -16,6 +16,8 @@ library(psych)
 library(plm)
 library(car)
 library(ggplot2)
+library(plm)
+library(systemfit)
 describe(mydata,fast=TRUE)
 summary(mydata)
 
@@ -31,6 +33,9 @@ summary(model)
 
 table(survey_reliability<5, country)
 table(yy,country)
+table(zmanagement, country)
+table(ave(zmanagement, country, FUN = function(x) mean(x, trim = 0.1)), country)
+
 
 cor(zmanagement, cc_uk)
 cor(zmanagement, cc_br)
@@ -40,3 +45,9 @@ cor(zmanagement, cc_us)
 
 cor(mydata[23:27])
 cor(zmanagement, zami_rate)
+
+model<- plm(zami_rate~zmanagement+hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors+yy06+yy09, model = "within",  data = mydata, index = "country")
+summary(model)
+
+model<-lm(zami_rate~zmanagement+cc_br+cc_ca+cc_sw+cc_uk+cc_us+yy06+yy09+hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors)
+summary(model)
