@@ -14,6 +14,8 @@ str(mydata)
 #install.packages('psych')
 library(psych)
 library(plm)
+library(car)
+library(ggplot2)
 describe(mydata,fast=TRUE)
 summary(mydata)
 
@@ -27,7 +29,14 @@ plot(zmanagement,zami_rate)
 model<-lm(zami_rate~zmanagement)
 summary(model)
 
-table(survey_reliability<5)
-table(country)
-cc_ca
+table(survey_reliability<5, country)
+table(yy,country)
 
+cor(zmanagement, cc_uk)
+cor(zmanagement, cc_br)
+cor(zmanagement, cc_ca)
+cor(zmanagement, cc_sw)
+cor(zmanagement, cc_us)
+
+cor(mydata[23:27])
+cor(zmanagement, zami_rate)
