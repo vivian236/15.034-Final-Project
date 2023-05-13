@@ -10,9 +10,7 @@ mydata <- read.csv("management_and_health_034.csv")
 attach(mydata)
 
 str(mydata)
-################ Some Descriptive Statistics ################ 
-#install.packages('psych')
-#install.packages("AER")
+
 library(psych)
 library(plm)
 library(car)
@@ -21,86 +19,87 @@ library(plm)
 library(systemfit)
 library(tidyverse)
 library(AER)
+
+################ Exporatory Data Analysis ################ 
+
 describe(mydata,fast=TRUE)
 summary(mydata)
 
-#y variable should be mortality rate
-#x variable is z management
-#fixed effects model?
-#
-plot(hospital_id,zmanagement)
+#scatter plot between outcome variable and dependent variable
 plot(zmanagement,zami_rate)
 
-plot(zmanagement, as.factor(country))
-as.factor(country)
-model<-lm(zami_rate~zmanagement)
-summary(model)
+#box plot of distribution of z management score
+plot(as.factor(country), zmanagement, xlab = "Country", ylab = "Management Score")
 
-table(survey_reliability<5, country)
-table(yy,country)
-table(zmanagement, country)
-table(ave(zmanagement, country, FUN = function(x) mean(x, trim = 0.1)), country)
+#table of average z management score per country
+aggregate(zmanagement, list(country), FUN=mean)
 
-newdata = filter(mydata, country=="United Kingdom")
-h<-hist(newdata[, "zmanagement"])
-xfit<-seq(min(newdata[, "zmanagement"]),max(newdata[, "zmanagement"]),length=40)
-yfit<-dnorm(xfit,mean=mean(newdata[, "zmanagement"]),sd=sd(newdata[, "zmanagement"]))
-yfit <- yfit*diff(h$mids[1:2])*length(newdata[, "zmanagement"])
-lines(xfit, yfit, col="blue", lwd=2)
+#plot of distribution of z management scores per country
+ggplot(data = mydata, aes(zmanagement))+geom_histogram(binwidth = 0.5, aes(y=..density..),color="black", fill="white")+geom_density(alpha=0.2)+facet_grid(.~country)
 
-cor(zmanagement, cc_uk)
-cor(zmanagement, cc_br)
-cor(zmanagement, cc_ca)
-cor(zmanagement, cc_sw)
-cor(zmanagement, cc_us)
+#plot of distribution of mortality rate per country
+ggplot(data = mydata, aes(zami_rate))+geom_histogram(binwidth = 0.5, aes(y=..density..),color="black", fill="white")+geom_density(alpha=0.2)+facet_grid(.~country)
 
-cor(mydata[23:27])
-cor(zmanagement, zami_rate)
+#scatter plot of z management scores and mortality rate per country
+ggplot(data = mydata, aes(zmanagement, zami_rate))+geom_point(shape=1)+facet_grid(.~country)
 
+#correlation matrix between z management and mortality rate and various hospital controls
+cor(mydata[, c("zami_rate", "hos_lbed", "hos_fprofit", "hos_nfprofit")], zmanagement)
+
+#correlation matrix between z managementa and different countries
+cor(mydata[, c("cc_uk", "cc_sw", "cc_ca", "cc_br", "cc_us")], zmanagement)
+
+################ Models ################ 
+
+#basic model with only outcome variable and dependent variable
 basic_model <- lm(zami_rate~zmanagement)
 summary(basic_model)
 summary(basic_model)$coefficients
 
-
-model<- plm(zami_rate~zmanagement+hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors+yy06+yy09, model = "within",  data = mydata, index = "country")
+#IV model with year control and survey reliability
+model<- ivreg(zami_rate~zmanagement+yy06+yy09+survey_reliability+survey_reliability_miss | logcom_ttime+yy06+yy09+survey_reliability+survey_reliability_miss)
 summary(model)
 
-model<-lm(zami_rate~zmanagement+cc_br+cc_ca+cc_sw+cc_uk+cc_us+yy06+yy09+hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors)
-summary(model)
+#IV model with all controls
+all_controls <- ivreg(zami_rate~zmanagement+yy06+yy09+survey_reliability+survey_reliability_miss+yy06+yy09+survey_reliability+survey_reliability_miss
+                      +hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors
+                      +grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_prec_new+grid_temp_new+grid_temp_new_miss
+                      +as.factor(country)+grid_lmerpop2005+grid_lmerpop2005m|logcom_ttime+yy06+yy09+survey_reliability+survey_reliability_miss+yy06+yy09+survey_reliability+survey_reliability_miss
+                      +hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors
+                      +grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_prec_new+grid_temp_new+grid_temp_new_miss
+                      +as.factor(country)+grid_lmerpop2005+grid_lmerpop2005m)
+summary(all_controls)
 
-model<-systemfit(method = "2SLS", zami_rate~zmanagement+hos_lbed+hos_fprofit+hos_nfprofit+yy06+yy09, inst = ~hos_lbed+hos_fprofit+hos_nfprofit+yy06+yy09+logcom_ttime)
-summary(model)
-
+#IV model with hospital controls and year controls
 #hospital controls seems to be bad control variables - high p values
 model<- ivreg(zami_rate~zmanagement+yy06+yy09+hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors | logcom_ttime+yy06+yy09+hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors)
 summary(model)
 
-#model with geographic controls - control for GDP seems to be bad - high p value (0.96)
+#IV model with all geographic controls  and year controls
+#control for GDP seems to be bad - high p value (0.96)
 model<- ivreg(zami_rate~zmanagement+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_lmerpop2005+grid_lmerpop2005m+grid_prec_new+grid_temp_new+grid_temp_new_miss
               | logcom_ttime+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_lmerpop2005+grid_lmerpop2005m+grid_prec_new+grid_temp_new+grid_temp_new_miss)
 summary(model)
 
+#IV model with geographic controls and year control and survey reliability
 model<- ivreg(zami_rate~zmanagement+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_prec_new+grid_temp_new+grid_temp_new_miss
               +as.factor(country)+survey_reliability+survey_reliability_miss
               | logcom_ttime+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_lmerpop2005+grid_lmerpop2005m+grid_prec_new+grid_temp_new+grid_temp_new_miss +as.factor(country)+survey_reliability+survey_reliability_miss)
 summary(model)
 
-#model with geographic controls and survey reliability
+#IV model with geographic controls and and year controls and country and survey reliability
 model<- ivreg(zami_rate~zmanagement+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_prec_new+grid_temp_new+grid_temp_new_miss
-              +cc_br+cc_ca+cc_sw+cc_uk+cc_us+survey_reliability+survey_reliability_miss
+              +as.factor(country)+survey_reliability+survey_reliability_miss
               | logcom_ttime+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_lmerpop2005+grid_lmerpop2005m+grid_prec_new+grid_temp_new+grid_temp_new_miss
-              +cc_br+cc_ca+cc_sw+cc_uk+cc_us+survey_reliability+survey_reliability_miss)
+              +as.factor(country)+survey_reliability+survey_reliability_miss)
 summary(model)
 
+#check instrument variable with dependent variable and outcome variable
 model<- lm(zmanagement~logcom_ttime)
 summary(model)
 
 model<-lm(zami_rate~logcom_ttime)
 summary(model)
 
-#instrument can't be correlated with other variables
-#no direct effect of the treatment on the outcome
-model<-lm(zami_rate~zmanagement)
-summary(model)
 
 
