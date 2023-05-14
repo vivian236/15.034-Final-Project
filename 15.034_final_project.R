@@ -19,6 +19,7 @@ library(plm)
 library(systemfit)
 library(tidyverse)
 library(AER)
+library(rmarkdown)
 
 ################ Exporatory Data Analysis ################ 
 
@@ -46,60 +47,34 @@ ggplot(data = mydata, aes(zmanagement, zami_rate))+geom_point(shape=1)+facet_gri
 #correlation matrix between z management and mortality rate and various hospital controls
 cor(mydata[, c("zami_rate", "hos_lbed", "hos_fprofit", "hos_nfprofit")], zmanagement)
 
-#correlation matrix between z managementa and different countries
+#correlation matrix between z management and different countries
 cor(mydata[, c("cc_uk", "cc_sw", "cc_ca", "cc_br", "cc_us")], zmanagement)
 
 ################ Models ################ 
 
-#basic model with only outcome variable and dependent variable
-basic_model <- lm(zami_rate~zmanagement)
+#basic model with outcome variable (zami_rate) and dependent variable (zmanagement) 
+#and controls for year survey was taken, survey reliability, type of hospital, and country hospital is located in
+basic_model <- lm(zami_rate~zmanagement++yy06+yy09+survey_reliability+survey_reliability_miss+hos_lbed+hos_fprofit+hos_nfprofit+as.factor(country))
 summary(basic_model)
 summary(basic_model)$coefficients
 
-#IV model with year control and survey reliability
-model<- ivreg(zami_rate~zmanagement+yy06+yy09+survey_reliability+survey_reliability_miss | logcom_ttime+yy06+yy09+survey_reliability+survey_reliability_miss)
+#We are using logcom_ttime as our instrument
+#check if instrumental variable is correlated with zmanagement
+m<-lm(zmanagement~logcom_ttime)
+summary(m)
+
+#check the strength of the instrument
+cor(logcom_ttime, zmanagement)
+
+#IV model with logcom_ttime as the instrument
+#and controls for year survey was taken, survey reliability, type of hospital, and country hospital is located in
+model <- ivreg(zami_rate~zmanagement+yy06+yy09+survey_reliability+survey_reliability_miss+hos_lbed+hos_fprofit+hos_nfprofit+as.factor(country) |
+                 logcom_ttime+yy06+yy09+survey_reliability+survey_reliability_miss+hos_lbed+hos_fprofit+hos_nfprofit+as.factor(country))
 summary(model)
 
-#IV model with all controls
-all_controls <- ivreg(zami_rate~zmanagement+yy06+yy09+survey_reliability+survey_reliability_miss+yy06+yy09+survey_reliability+survey_reliability_miss
-                      +hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors
-                      +grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_prec_new+grid_temp_new+grid_temp_new_miss
-                      +as.factor(country)+grid_lmerpop2005+grid_lmerpop2005m|logcom_ttime+yy06+yy09+survey_reliability+survey_reliability_miss+yy06+yy09+survey_reliability+survey_reliability_miss
-                      +hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors
-                      +grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_prec_new+grid_temp_new+grid_temp_new_miss
-                      +as.factor(country)+grid_lmerpop2005+grid_lmerpop2005m)
-summary(all_controls)
-
-#IV model with hospital controls and year controls
-#hospital controls seems to be bad control variables - high p values
-model<- ivreg(zami_rate~zmanagement+yy06+yy09+hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors | logcom_ttime+yy06+yy09+hos_lbed+hos_fprofit+hos_nfprofit+hos_numcompetitors)
+#IV model with same controls but using lqs_com as the instrument
+model <- ivreg(zami_rate~zmanagement+yy06+yy09+survey_reliability+survey_reliability_miss+hos_lbed+hos_fprofit+hos_nfprofit+as.factor(country) |
+                 lqs_com+yy06+yy09+survey_reliability+survey_reliability_miss+hos_lbed+hos_fprofit+hos_nfprofit+as.factor(country))
 summary(model)
-
-#IV model with all geographic controls  and year controls
-#control for GDP seems to be bad - high p value (0.96)
-model<- ivreg(zami_rate~zmanagement+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_lmerpop2005+grid_lmerpop2005m+grid_prec_new+grid_temp_new+grid_temp_new_miss
-              | logcom_ttime+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_lmerpop2005+grid_lmerpop2005m+grid_prec_new+grid_temp_new+grid_temp_new_miss)
-summary(model)
-
-#IV model with geographic controls and year control and survey reliability
-model<- ivreg(zami_rate~zmanagement+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_prec_new+grid_temp_new+grid_temp_new_miss
-              +as.factor(country)+survey_reliability+survey_reliability_miss
-              | logcom_ttime+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_lmerpop2005+grid_lmerpop2005m+grid_prec_new+grid_temp_new+grid_temp_new_miss +as.factor(country)+survey_reliability+survey_reliability_miss)
-summary(model)
-
-#IV model with geographic controls and and year controls and country and survey reliability
-model<- ivreg(zami_rate~zmanagement+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_prec_new+grid_temp_new+grid_temp_new_miss
-              +as.factor(country)+survey_reliability+survey_reliability_miss
-              | logcom_ttime+yy06+yy09+grid_elev_srtm_pred+grid_ldis_ocean+grid_ldis_ocean_miss+grid_ldis_river+grid_ldis_river_miss+grid_lmerpop2005+grid_lmerpop2005m+grid_prec_new+grid_temp_new+grid_temp_new_miss
-              +as.factor(country)+survey_reliability+survey_reliability_miss)
-summary(model)
-
-#check instrument variable with dependent variable and outcome variable
-model<- lm(zmanagement~logcom_ttime)
-summary(model)
-
-model<-lm(zami_rate~logcom_ttime)
-summary(model)
-
-
-
+#note this model is weaker than the first IV model
+#therefore logcom_ttime is an appropriate instrument to use in this situation
